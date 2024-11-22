@@ -150,6 +150,21 @@ def login_user():
     else:
         messagebox.showwarning("Error", "All fields must be filled!")
 
+def delete_print_job(job_id):
+    name = entry_name.get() #Henter den nuværende bruger
+    with sqlite3.connect("login_user") as con:
+        cursor = con.cursor()
+        cursor.execute("SELECT role FROM login WHERE name = ?", (name,))
+        user = cursor.fetchall() 
+    if user and user[0] == 'admin':
+        with sqlite3.connect("print.db") as print_con:
+            print_cursor = print_con.cursor()
+            print_cursor.execute("DELETE FROM print WHERE id = ?", (job_id,))
+            print_con.commit()
+        messagebox.showinfo("Slet",f"Print job ID {job_id} er nu blevet slettet.")
+    else:
+        messagebox.showerror("Adgang nægtet","Du har ikke admin rettigheder!")
+
 # vis 3d beregner skærm efter login
 def show_calculator_screen():
     frame_login.pack_forget()  # Hide login frame
