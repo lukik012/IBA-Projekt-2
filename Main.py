@@ -11,6 +11,7 @@ def initialize_database():
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                    name TEXT NOT NULL,
                    password TEXT NOT NULL
+                   role TEXT NOT NULL DEFAULT 'user'
                    )''')
     con.commit()
     con.close()
@@ -36,12 +37,12 @@ initialize_database()
 initialize_print_jobs()
 
 # Funktion til at gemme login data
-def save_to_database(name, password, retries=5, delay=0.1):
+def save_to_database(name, password, role='user', retries=5, delay=0.1):
     for _ in range(retries):
         try:
             with sqlite3.connect("login.db") as con:
                 cursor = con.cursor()
-                cursor.execute("INSERT INTO login (name, password) VALUES (?, ?)", (name, password))
+                cursor.execute("INSERT INTO login (name, password, role) VALUES (?, ?, ?)", (name, password, role))
                 con.commit()
             return True
         except sqlite3.OperationalError as e:
@@ -125,8 +126,22 @@ def calculate_print_cost(printer_type, printer_model, material, amount, unit):
 def login_user():
     name = entry_name.get()
     password = entry_password.get()
-
+#Når brugeren logger ind, tjekker vi deres rolle, og kun "admin"-brugere får adgang til skriverettigheder.
     if name and password:
+        with sqlite3.connect("login.db") as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT role FROM login WHERE name = ? AND password = ?", (name, password))
+            user = cursor.fetchone()
+        if user:
+            role = user[0]
+            if role == 'admin':
+                messagebox.showinfo("Login", f"Velkommen Admin: \nName:{name}")
+                show_calculator_screen()
+            else:
+                messagebox.showinfo("Login", f"Velkommen:\nName:{name}")
+        else: messagebox.showerror("Error", "Forkerte credentials!")
+    else:
+        messagebox.showwarning("Error", "Alle felter skal udfyldes!")
         if save_to_database(name, password):
             messagebox.showinfo("Login", f"Velkommen:\nName: {name}")
             show_calculator_screen()
