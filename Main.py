@@ -127,28 +127,22 @@ def login_user():
     name = entry_name.get()
     password = entry_password.get()
 #Når brugeren logger ind, tjekker vi deres rolle, og kun "admin"-brugere får adgang til skriverettigheder.
-    if name and password:
+    if name and password: #Tjekker om alle felter er udfyldt
         with sqlite3.connect("login.db") as con:
             cursor = con.cursor()
             cursor.execute("SELECT role FROM login WHERE name = ? AND password = ?", (name, password))
-            user = cursor.fetchone()
-        if user:
-            role = user[0]
-            if role == 'admin':
+            user = cursor.fetchone() #Henter rolle fra databasen
+
+        if user: #Hvis brugeren findes
+            role = user[0] #Så henter vi rollen
+            if role == 'admin': #Admin login
                 messagebox.showinfo("Login", f"Velkommen Admin: \nName:{name}")
                 show_calculator_screen()
-            else:
+            else: #Ellers kører den normalt bruger login
                 messagebox.showinfo("Login", f"Velkommen:\nName:{name}")
         else: messagebox.showerror("Error", "Forkerte credentials!")
     else:
         messagebox.showwarning("Error", "Alle felter skal udfyldes!")
-        if save_to_database(name, password):
-            messagebox.showinfo("Login", f"Velkommen:\nName: {name}")
-            show_calculator_screen()
-        else:
-            messagebox.showerror("Error", "Name is already registered!")
-    else:
-        messagebox.showwarning("Error", "All fields must be filled!")
 
 def delete_print_job(job_id):
     name = entry_name.get() #Henter den nuværende bruger
