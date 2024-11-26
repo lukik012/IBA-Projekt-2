@@ -7,11 +7,13 @@ import time
 def initialize_database():
     con = sqlite3.connect('login.db')
     cursor = con.cursor()
+    cursor.execute("PRAGMA table_info(login)") #Debug 
+    print(cursor.fetchall())
     cursor.execute('''CREATE TABLE IF NOT EXISTS login(
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                    name TEXT NOT NULL,
-                   password TEXT NOT NULL
-                   role TEXT NOT NULL DEFAULT 'user'
+                   password TEXT NOT NULL,
+                   user_role TEXT NOT NULL 
                    )''')
     con.commit()
     con.close()
@@ -37,12 +39,12 @@ initialize_database()
 initialize_print_jobs()
 
 # Funktion til at gemme login data
-def save_to_database(name, password, role='user', retries=5, delay=0.1):
+def save_to_database(name, password, user_role='user', retries=5, delay=0.1):
     for _ in range(retries):
         try:
             with sqlite3.connect("login.db") as con:
                 cursor = con.cursor()
-                cursor.execute("INSERT INTO login (name, password, role) VALUES (?, ?, ?)", (name, password, role))
+                cursor.execute("INSERT INTO login (name, password, user_role) VALUES (?, ?, ?)", (name, password, user_role))
                 con.commit()
             return True
         except sqlite3.OperationalError as e:
@@ -122,6 +124,24 @@ def calculate_print_cost(printer_type, printer_model, material, amount, unit):
 
     return f"Total price: ${cost:.2f}"
 
+#Funktion til at tilføje bruger
+def add_user(name, password, user_role):
+    try:
+        con = sqlite3.connect('login.db')
+        cursor = con.cursor()
+        #Tilføj bruger
+        cursor.execute("INSERT INTO LOGIN(name, password, user_role) VALUES(?, ?, ?)",
+                   (name,password, user_role))
+        #Gem ændringer
+        con.commit()
+        print(f"Bruger{name} tilføjet successfuldt.")
+    except sqlite3.Error as e:
+        print(f"Fejl ved tilføjelse af bruger: {e}")
+    finally:
+        #Lukker forbindelsen
+        con.close()
+#Test tilføjelse af bruger
+add_user('admin', 'admin123', 'admin')
 # Login user
 def login_user():
     name = entry_name.get()
@@ -130,7 +150,7 @@ def login_user():
     if name and password: #Tjekker om alle felter er udfyldt
         with sqlite3.connect("login.db") as con:
             cursor = con.cursor()
-            cursor.execute("SELECT role FROM login WHERE name = ? AND password = ?", (name, password))
+            cursor.execute("SELECT user_role FROM login WHERE name = ? AND password = ?", (name, password))
             user = cursor.fetchone() #Henter rolle fra databasen
 
         if user: #Hvis brugeren findes
