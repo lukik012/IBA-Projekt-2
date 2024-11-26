@@ -144,8 +144,8 @@ def login_user():
         else: messagebox.showerror("Error", "Forkerte credentials!")
     else:
         messagebox.showwarning("Error", "Alle felter skal udfyldes!")
-        
-def write_to_database():                                                                #Lidt usikker på denne funktion.
+
+def write_to_database():                                                                
     #Denne funktion giver admin mulighed for at skrive til databasen
     process = combobox_printer_type.get() #Henter data fra UI
     material = combobox_material.get()
