@@ -137,12 +137,31 @@ def login_user():
             role = user[0] #Så henter vi rollen
             if role == 'admin': #Admin login
                 messagebox.showinfo("Login", f"Velkommen Admin: \nName:{name}")
-                show_calculator_screen()
+                show_calculator_screen(admin= True) # Her kalder vi så vores beregner, med admin adgang
             else: #Ellers kører den normalt bruger login
                 messagebox.showinfo("Login", f"Velkommen:\nName:{name}")
+                show_calculator_screen(admin=False) # Her får brugeren beregneren vist, men i læse adgang
         else: messagebox.showerror("Error", "Forkerte credentials!")
     else:
         messagebox.showwarning("Error", "Alle felter skal udfyldes!")
+        
+def write_to_database():                                                                #Lidt usikker på denne funktion.
+    #Denne funktion giver admin mulighed for at skrive til databasen
+    process = combobox_printer_type.get() #Henter data fra UI
+    material = combobox_material.get()
+    cost = entry_amount.get()
+    
+    #Kontroller om input er korrekt
+    if process and material and cost:
+        with sqlite3.connect("print.db") as con:
+            cursor = con.cursor()
+            #Eksempel på at indsætte data i databasen
+            cursor.execute("INSERT INTO print(process, material, cost) VALUES(?, ?, ?)",
+                        (process, material, cost))
+            con.commit()
+            messagebox.showinfo("Sucess", "Data er blevet skrevet til databasen!")
+    else:
+        messagebox.showerror("Fejl", "Alle felter skal udfyldes for at gemme data ")
 
 def delete_print_job(job_id):
     name = entry_name.get() #Henter den nuværende bruger
@@ -160,7 +179,16 @@ def delete_print_job(job_id):
         messagebox.showerror("Adgang nægtet","Du har ikke admin rettigheder!")
 
 # vis 3d beregner skærm efter login
-def show_calculator_screen():
+def show_calculator_screen(admin = False):
+    calculator_window = tk.Toplevel()
+    calculator_window.title("3D print beregner")
+
+    if admin:
+        tk.Label(calculator_window, text="Admin adgang: Du kan skrive til databasen").pack()
+        tk.Button(calculator_window, text="Skriv til database", command=write_to_database)
+    else:
+        tk.Label(calculator_window, text="Læse adgang: Du kan kun bruge læse funktioner").pack()
+        
     frame_login.pack_forget()  # Hide login frame
     frame_calculator.pack(padx=10, pady=10, fill="both")  # Show calculator frame
 
