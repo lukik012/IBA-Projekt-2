@@ -7,7 +7,6 @@ import time
 def initialize_database():
     con = sqlite3.connect('login.db')
     cursor = con.cursor()
-    cursor.execute("PRAGMA table_info(login)") #Debug 
     print(cursor.fetchall())
     cursor.execute('''CREATE TABLE IF NOT EXISTS login(
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
