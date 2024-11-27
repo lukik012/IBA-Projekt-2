@@ -7,10 +7,13 @@ import time
 def initialize_database():
     con = sqlite3.connect('login.db')
     cursor = con.cursor()
+    cursor.execute("PRAGMA table_info(login)") #Debug 
+    print(cursor.fetchall())
     cursor.execute('''CREATE TABLE IF NOT EXISTS login(
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                    name TEXT NOT NULL,
-                   password TEXT NOT NULL
+                   password TEXT NOT NULL,
+                   user_role TEXT NOT NULL 
                    )''')
     con.commit()
     con.close()
@@ -36,12 +39,12 @@ initialize_database()
 initialize_print_jobs()
 
 # Funktion til at gemme login data
-def save_to_database(name, password, retries=5, delay=0.1):
+def save_to_database(name, password, user_role='user', retries=5, delay=0.1):
     for _ in range(retries):
         try:
             with sqlite3.connect("login.db") as con:
                 cursor = con.cursor()
-                cursor.execute("INSERT INTO login (name, password) VALUES (?, ?)", (name, password))
+                cursor.execute("INSERT INTO login (name, password, user_role) VALUES (?, ?, ?)", (name, password, user_role))
                 con.commit()
             return True
         except sqlite3.OperationalError as e:
@@ -121,22 +124,91 @@ def calculate_print_cost(printer_type, printer_model, material, amount, unit):
 
     return f"Total price: ${cost:.2f}"
 
+#Funktion til at tilføje admin bruger 
+def add_user(name, password, user_role):
+    try:
+        con = sqlite3.connect('login.db')
+        cursor = con.cursor()
+        #Tilføj bruger
+        cursor.execute("INSERT INTO LOGIN(name, password, user_role) VALUES(?, ?, ?)",
+                   (name,password, user_role))
+        #Gem ændringer
+        con.commit()
+        print(f"Bruger{name} tilføjet successfuldt.")
+    except sqlite3.Error as e:
+        print(f"Fejl ved tilføjelse af bruger: {e}")
+    finally:
+        #Lukker forbindelsen
+        con.close()
+#ADMIN BRUGER 
+add_user('admin', 'admin123', 'admin')
 # Login user
 def login_user():
     name = entry_name.get()
     password = entry_password.get()
+#Når brugeren logger ind, tjekker vi deres rolle, og kun "admin"-brugere får adgang til skriverettigheder.
+    if name and password: #Tjekker om alle felter er udfyldt
+        with sqlite3.connect("login.db") as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT user_role FROM login WHERE name = ? AND password = ?", (name, password))
+            user = cursor.fetchone() #Henter rolle fra databasen
 
-    if name and password:
-        if save_to_database(name, password):
-            messagebox.showinfo("Login", f"Velkommen:\nName: {name}")
-            show_calculator_screen()
-        else:
-            messagebox.showerror("Error", "Name is already registered!")
+        if user: #Hvis brugeren findes
+            role = user[0] #Så henter vi rollen
+            if role == 'admin': #Admin login
+                messagebox.showinfo("Login", f"Velkommen Admin: \nName:{name}")
+                show_calculator_screen(admin= True) # Her kalder vi så vores beregner, med admin adgang
+            else: #Ellers kører den normalt bruger login
+                messagebox.showinfo("Login", f"Velkommen:\nName:{name}")
+                show_calculator_screen(admin=False) # Her får brugeren beregneren vist, men i læse adgang
+        else: messagebox.showerror("Error", "Forkerte credentials!")
     else:
-        messagebox.showwarning("Error", "All fields must be filled!")
+        messagebox.showwarning("Error", "Alle felter skal udfyldes!")
+
+def write_to_database():                                                                
+    #Denne funktion giver admin mulighed for at skrive til databasen
+    process = combobox_printer_type.get() #Henter data fra UI
+    material = combobox_material.get()
+    cost = entry_amount.get()
+    
+    #Kontroller om input er korrekt
+    if process and material and cost:
+        with sqlite3.connect("print.db") as con:
+            cursor = con.cursor()
+            #Eksempel på at indsætte data i databasen
+            cursor.execute("INSERT INTO print(process, material, cost) VALUES(?, ?, ?)",
+                        (process, material, cost))
+            con.commit()
+            messagebox.showinfo("Sucess", "Data er blevet skrevet til databasen!")
+    else:
+        messagebox.showerror("Fejl", "Alle felter skal udfyldes for at gemme data ")
+
+def delete_print_job(job_id):
+    name = entry_name.get() #Henter den nuværende bruger
+    with sqlite3.connect("login_user") as con:
+        cursor = con.cursor()
+        cursor.execute("SELECT role FROM login WHERE name = ?", (name,))
+        user = cursor.fetchall() 
+    if user and user[0] == 'admin':
+        with sqlite3.connect("print.db") as print_con:
+            print_cursor = print_con.cursor()
+            print_cursor.execute("DELETE FROM print WHERE id = ?", (job_id,))
+            print_con.commit()
+        messagebox.showinfo("Slet",f"Print job ID {job_id} er nu blevet slettet.")
+    else:
+        messagebox.showerror("Adgang nægtet","Du har ikke admin rettigheder!")
 
 # vis 3d beregner skærm efter login
-def show_calculator_screen():
+def show_calculator_screen(admin = False):
+    calculator_window = tk.Toplevel()
+    calculator_window.title("3D print beregner")
+
+    if admin:
+        tk.Label(calculator_window, text="Admin adgang: Du kan skrive til databasen").pack()
+        tk.Button(calculator_window, text="Skriv til database", command=write_to_database)
+    else:
+        tk.Label(calculator_window, text="Læse adgang: Du kan kun bruge læse funktioner").pack()
+        
     frame_login.pack_forget()  # Hide login frame
     frame_calculator.pack(padx=10, pady=10, fill="both")  # Show calculator frame
 
@@ -232,7 +304,7 @@ def calculate_and_display_cost():
         density = material_cost[printer_type][printer_model].get('density', 1) #Henter density fra vores dict
         save_calculation(printer_type, printer_model, material, cost_value, unit, density)
     else:
-        label_result.congif(text=result)
+        label_result.config(text=result)
 
 
 #Funktion til at gemme beregninger i print.db
