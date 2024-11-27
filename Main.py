@@ -134,7 +134,7 @@ def add_user(name, password, user_role):
                    (name,password, user_role))
         #Gem ændringer
         con.commit()
-        print(f"Bruger{name} tilføjet successfuldt.")
+        print(f"Bruger {name} tilføjet successfuldt.")
     except sqlite3.Error as e:
         print(f"Fejl ved tilføjelse af bruger: {e}")
     finally:
@@ -142,6 +142,8 @@ def add_user(name, password, user_role):
         con.close()
 #ADMIN BRUGER 
 add_user('admin', 'admin123', 'admin')
+#Normal bruger
+add_user('user', 'user1', 'user')
 # Login user
 def login_user():
     name = entry_name.get()
@@ -156,10 +158,10 @@ def login_user():
         if user: #Hvis brugeren findes
             role = user[0] #Så henter vi rollen
             if role == 'admin': #Admin login
-                messagebox.showinfo("Login", f"Velkommen Admin: \nName:{name}")
+                messagebox.showinfo("Login", f"Velkommen Admin: \nName: {name}")
                 show_calculator_screen(admin= True) # Her kalder vi så vores beregner, med admin adgang
             else: #Ellers kører den normalt bruger login
-                messagebox.showinfo("Login", f"Velkommen:\nName:{name}")
+                messagebox.showinfo("Login", f"Velkommen:\nName: {name}")
                 show_calculator_screen(admin=False) # Her får brugeren beregneren vist, men i læse adgang
         else: messagebox.showerror("Error", "Forkerte credentials!")
     else:
