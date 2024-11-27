@@ -124,7 +124,7 @@ def calculate_print_cost(printer_type, printer_model, material, amount, unit):
 
     return f"Total price: ${cost:.2f}"
 
-#Funktion til at tilføje bruger
+#Funktion til at tilføje admin bruger 
 def add_user(name, password, user_role):
     try:
         con = sqlite3.connect('login.db')
@@ -140,7 +140,7 @@ def add_user(name, password, user_role):
     finally:
         #Lukker forbindelsen
         con.close()
-#Test tilføjelse af bruger
+#ADMIN BRUGER 
 add_user('admin', 'admin123', 'admin')
 # Login user
 def login_user():
@@ -304,7 +304,7 @@ def calculate_and_display_cost():
         density = material_cost[printer_type][printer_model].get('density', 1) #Henter density fra vores dict
         save_calculation(printer_type, printer_model, material, cost_value, unit, density)
     else:
-        label_result.congif(text=result)
+        label_result.config(text=result)
 
 
 #Funktion til at gemme beregninger i print.db
