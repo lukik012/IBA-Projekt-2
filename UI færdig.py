@@ -1,9 +1,8 @@
 import tkinter as tk
 import customtkinter as c
 from tkinter import ttk, messagebox
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import sqlite3
+import numpy as np
 from datetime import datetime
 import time
 #Start databases for login og print jobs
@@ -155,8 +154,6 @@ def login_frame():
 def show_menu():
     frame.pack_forget()
     frame_calculator.pack_forget()
-    settings_frame.pack_forget()
-    frame_graph.pack_forget()
     menu_frame.pack(padx=10, fill="both", expand=True)
 
 # vis 3d beregner skærm efter menu
@@ -169,16 +166,6 @@ def back_to_menu_from_calculator():
     frame_calculator.pack_forget()  # gemmer frame
     menu_frame.pack(padx=10, fill="both", expand=True)  # viser menu
 
-# Show Settings Screen
-def show_settings():
-    menu_frame.pack_forget()  # Hide the menu frame
-    settings_frame.pack(padx=10, pady=10, fill="both", expand=True)  #viser settings frame
-
-# Back to Menu from Settings
-def show_menu_from_settings():
-    settings_frame.pack_forget()  # Hide settings frame
-    menu_frame.pack(padx=10, pady=10, fill="both", expand=True) #viser menu frame
-
 # Menu Buttons
 def open_calculator():
     show_calculator_screen()
@@ -187,15 +174,12 @@ def open_history():
     show_saved_calculations()
     messagebox.showinfo("History", "Viser gemte beregninger")
 
-def open_settings():
-    show_settings()  #viser seetings frame
-
 
 #Funktion til at opdatere printer modeller alt efter hvilken printer type der er valgt
 def update_models(event=None):
     printer_type = combobox_printer_type.get()
-    if printer_type in calculate_and_display_cost:
-        models = list(calculate_and_display_cost[printer_type].keys())
+    if printer_type in material_cost:
+        models = list(material_cost[printer_type].keys())
     else:
         models = []
     # Ryd printermodel-dropsdown og opdater det baseret på valgte printertype
@@ -208,8 +192,8 @@ def update_materials(event=None):
     model = combobox_printer_model.get()
     
     # Tjek om printertypen og modellen findes i material_cost
-    if printer_type in calculate_and_display_cost and model in calculate_and_display_cost[printer_type]:
-        model_data = calculate_and_display_cost[printer_type][model]
+    if printer_type in material_cost and model in material_cost[printer_type]:
+        model_data = material_cost[printer_type][model]
         material = model_data['material']  # Henter materiale fra model_data
         
         # Opdater material combobox med relevante materialer
@@ -232,9 +216,9 @@ def update_unit(event=None):
     selected_printer_model = combobox_printer_model.get() #Henter den valgte printermodel
 
     #tjekker om printertype og model findes i vores material_cost dictionary
-    if selected_printer_type in calculate_and_display_cost and selected_printer_model in calculate_and_display_cost[selected_printer_type]:
-        model_data = calculate_and_display_cost[selected_printer_type][selected_printer_model]
-        
+    if selected_printer_type in material_cost and selected_printer_model in material_cost[selected_printer_type]:
+        model_data = material_cost[selected_printer_type][selected_printer_model]
+
         unit.clear() # Tøm unit-listen før vi tilføjer flere enheder
         
         #Finder de enheder baseret på de informationer vi finder i model_data
@@ -267,7 +251,6 @@ def calculate_and_display_cost():
     except ValueError:
         messagebox.showerror("Invalid input","Please enter a valid number ")
         return
-
     result = calculate_print_cost(printer_type, printer_model, material, amount, unit)
     print(f"Calculation result:{result}") #Debug
     #label_result.config(text=result)
@@ -283,6 +266,10 @@ def calculate_and_display_cost():
         save_calculation(printer_type, printer_model, material, cost_value, unit, density)
     else:
         label_result.config(text=result)
+        # Gem beregnet data til senere brug
+    global last_cost_data
+    last_cost_data = (printer_type, printer_model, material, amount, unit, total_cost)
+     #Her caller vi save_calculation, for at være sikre på beregningen bliver gemt i vores db
 
 
 #Funktion til at gemme beregninger i print.db
@@ -291,14 +278,22 @@ def save_calculation(printer_type, printer_model, material, cost, unit, density)
         messagebox.showinfo("Gemt", "Din beregning blev gemt")
     else:
         messagebox.showerror("Fejl", "Din beregning kunne ikke gemmes.")
-#Funktion til at hente og vise gemte beregninger fra print.db
+
 def show_saved_calculations():
     calculations_window = tk.Toplevel(root)
     calculations_window.title("Gemte beregninger")
     calculations_window.geometry("1083x693")
 
+# Styling af Treeview
+    style = ttk.Style()
+    style.configure("Treeview", font=("Tuffy", 12), rowheight=25, background="#444444", fieldbackground="#666666", foreground="#eaeaea")
+    style.map("Treeview", background=[("selected", "green")])  
+    style.configure("Treeview.Heading", font=("Tuffy", 14, "bold"), foreground="green", background="white")
+
+
 # Her laver vi en treeview widget, så den kan fremvise beregningerne i table format
-    tree = ttk.Treeview(calculations_window, columns =("Process", "Machine", "Material", "Cost", "Unit", "Density", "Timestamp"), show="headings")
+
+    tree = ttk.Treeview(show_saved_calculations, columns =("Process", "Machine", "Material", "Cost", "Unit", "Density", "Timestamp"), show="headings")
     tree.heading("Process", text="Process")
     tree.heading("Machine", text="Machine")
     tree.heading("Material", text="Material")
@@ -308,6 +303,8 @@ def show_saved_calculations():
     tree.heading("Timestamp", text="Timestamp")
 
     tree.pack(fill="both", expand=True)
+
+
 #Tilslutter os databasen og henter gemte beregninger
     con = sqlite3.connect("print.db")
     cursor = con.cursor()
@@ -319,7 +316,7 @@ def show_saved_calculations():
     for record in records:
         tree.insert("",tk.END, values=record)
 
-# Tkinter UI Setup
+
 root = c.CTk()
 root.title("User Registration and 3D Printer Cost Calculator")
 root.geometry("1083x693")
@@ -331,7 +328,7 @@ root.option_add("*Font", "Arial 12")
 root.option_add("*Button.padding", [10, 5])
 
 # Ydre container Frame
-frame = c.CTkFrame(master=root, fg_color='#757575')  # Baggrundsfarve for frame
+frame = c.CTkFrame(master=root, fg_color='#757575', corner_radius=10)  # Baggrundsfarve for frame
 frame.pack(pady=20, padx=60, fill="both", expand=True)
 
 
@@ -376,60 +373,30 @@ button_calculator.pack(pady=10, anchor="center")
 button_history = c.CTkButton(master=menu_frame, text="History", fg_color='#228B22', text_color="#FFFFFF", font=("Tuffy", 24), command=open_history)
 button_history.pack(pady=10, anchor="center")  
 
-button_settings = c.CTkButton(master=menu_frame, text="Settings", fg_color='#228B22', text_color="#FFFFFF", font=("Tuffy", 24), command=open_settings)
-button_settings.pack(pady=10, anchor="center") 
 
 # Opret en rød "Log ud"-knap
-button_logout = c.CTkButton(master=menu_frame, text="Log ud", fg_color='red', text_color="#FFFFFF", font=("Tuffy", 24), command=logout_user)
-button_logout.pack(pady=10, anchor="center")
-
-# Settings Frame
-settings_frame = c.CTkFrame(master=root, fg_color='#757575')
-
-# Indhold i Settings Frame
-settings_label = c.CTkLabel(
-    master=settings_frame, 
-    text="Settings", 
-    fg_color='#757575', 
-    text_color="#FFFFFF", 
-    font=("Tuffy", 64)
-)
-settings_label.pack(pady=20, anchor="center")
-
-# Tilbage-knap
-back_button = c.CTkButton(
-    master=settings_frame, 
-    text="Tilbage", 
-    fg_color='#228B22', 
-    text_color="#FFFFFF", 
-    font=("Tuffy", 24), 
-    command=lambda: show_menu_from_settings()
-)
-back_button.pack(pady=10, anchor="center")
-
-# Funktion til at vise Settings-siden
-def show_settings():
-    menu_frame.pack_forget()  # Skjul menuen
-    settings_frame.pack(padx=10, pady=10, fill="both", expand=True)
-
-# Funktion til at gå tilbage til menuen fra Settings-siden
-def show_menu_from_settings():
-    settings_frame.pack_forget()  # Skjul Settings
-    menu_frame.pack(padx=10, pady=10, fill="both", expand=True)
-
-# Opdater knap i menuen til at åbne Settings
-button_settings.configure(command=show_settings)
+button_logout = c.CTkButton(master=menu_frame, text="Log out", fg_color='red', text_color="#FFFFFF", font=("Tuffy", 24), command=logout_user)
+button_logout.pack(side="bottom", anchor="center", pady=10)
 
 # Cost Calculator Frame (Er gemt)
-frame_calculator = tk.LabelFrame(root, text="3D Printer Beregner", font=("Tuffy", 24), padx=10, pady=10)
+frame_calculator = tk.LabelFrame(root, text="3D Printer Calculator", font=("Tuffy", 24, "bold"), foreground="white", background="#333333", padx=10, pady=10) 
 frame_calculator.pack_forget()
 
-for widget in frame_calculator.winfo_children():
-    widget.destroy()
+# Dynamisk centrering ved resizing
+def resize(event):
+    if frame_calculator.winfo_ismapped():
+        frame_calculator.place(relx=0.5, rely=0.5, sticky="ew")
+
+def back_to_menu_from_calculator():
+    frame_calculator.pack_forget()  # Skjul beregningsskærmen
+    menu_frame.pack(padx=10, fill="both", expand=True)  # Vis menuen
+
+root.bind("<Configure>", resize)
+
 
 #Printer type dropdown menu
 printer_type = ['FDM', 'SLA', 'SLS', 'SLM', 'DLP']
-label_printer_type =tk.Label(frame_calculator,text="Printer type")
+label_printer_type =c.CTkLabel(frame_calculator,text="Printer type", text_color="white")
 label_printer_type.grid(row=0, column=0, sticky="w")
 
 combobox_printer_type = ttk.Combobox(frame_calculator, values= printer_type, state= "readonly")
@@ -439,7 +406,7 @@ combobox_printer_type.bind("<<ComboboxSelected>>", update_models) # Binder event
 
 #Printer model dropdown menu
 printer_model = ['Ultimaker 3', 'Fortus 360mc', 'Form2', 'ProX 950', 'EOSINT P800', 'EOSm100', '3D Systems Figure 4']
-label_printer_model = tk.Label(frame_calculator, text="Printer model")
+label_printer_model = c.CTkLabel(frame_calculator, text="Printer model", text_color="white")
 label_printer_model.grid(row= 1, column=0, sticky="w")
 
 combobox_printer_model = ttk.Combobox(frame_calculator, values= printer_model, state= "readonly")
@@ -448,14 +415,14 @@ combobox_printer_model.unbind("<<ComboboxSelected>>")
 combobox_printer_model.bind("<<ComboboxSelected>>", lambda event: update_materials())
 #Material dropdown menu
 material = ['ABS', 'Ultem', 'Clear Resin', 'Dental Model Resin', 'Accura Xtreme', 'Casting Resin', 'PA2200', 'PA12', 'Alumide', 'Ti6Al4V', 'SSL316']
-label_material = tk.Label(frame_calculator, text="Material")
+label_material = c.CTkLabel(frame_calculator, text="Material", text_color="white")
 label_material.grid(row=2, column= 0, sticky="w")
 combobox_material = ttk.Combobox(frame_calculator, values= material, state="readonly")
-combobox_material.grid(row=2, column=1)
+combobox_material.grid(row=2, column=1, sticky="w")
 
 #Unit dropdown menu
 unit = ['Kg', 'L', 'unit', '10Kg']
-label_unit = tk.Label(frame_calculator, text="Unit")
+label_unit = c.CTkLabel(frame_calculator, text="Unit", text_color="white")
 label_unit.grid(row=3, column=0, sticky="w")
 
 combobox_unit = ttk.Combobox(frame_calculator, values= unit, state="readonly")
@@ -464,60 +431,47 @@ combobox_unit.config(values=unit)
 combobox_unit.set('') # Tømmer dropdownen så man skal vælge en ny enhed
 
 #Amount skal forblive et input felt
-tk.Label(frame_calculator, text="Amount").grid(row=4, column=0, sticky="w")
-entry_amount = tk.Entry(frame_calculator)
+c.CTkLabel(frame_calculator, text="Amount", text_color="white").grid(row=4, column=0, sticky="w")
+entry_amount = c.CTkEntry(frame_calculator)
 #bruger sticky= "ew" for at sikre mig at input feltet strækker sig for at udfylde dens grid celle
-entry_amount.grid(row=4, column=1, sticky="ew")
+entry_amount.grid(row=4, column=1,columnspan=2, sticky="ew")
 
 #Input felt til antal emner
-tk.Label(frame_calculator, text= "Antal emner").grid(row=5, column=0, sticky="w")
-entry_antal_emner = tk.Entry(frame_calculator)
-entry_antal_emner.grid(row=5, column=1, sticky="ew")
-
-#graf frame
-frame_graph = tk.Frame(root, padx=10, pady=10)
-frame_graph.pack(side="right", fill="both", expand=True)
-
-#plot funktion
-def plot_graph():
-    figure = Figure(figsize=(5, 4), dpi=100)
-    ax = figure.add_subplot(111)
-    x = [1, 2, 3, 4, 5]  # Eksempeldata
-    y = [10, 20, 15, 25, 30]  # Eksempeldata
-    ax.plot(x, y, label="Omkostningskurve")
-    ax.set_title("Omkostningsanalyse", fontdict={"fontsize": 12})
-    ax.set_xlabel("Tid", fontsize=10)
-    ax.set_ylabel("Omkostning", fontsize=10)
-    ax.legend()
-
-    canvas = FigureCanvasTkAgg(master=frame_calculator)
-    canvas.draw()
-    canvas.get_tk_widget().pack(fill="both", expand=True)
+c.CTkLabel(frame_calculator, text= "N. of subjects", text_color="white").grid(row=5, column=0, sticky="w")
+entry_antal_emner = c.CTkEntry(frame_calculator)
+entry_antal_emner.grid(row=5, column=1, columnspan=2, sticky="ew")
 
 #Beregnings knap
-button_calculate = tk.Button(frame_calculator, text="Beregn", command=calculate_and_display_cost, font=("Tuffy", 10))
-button_calculate.grid(row=6, column=0, columnspan=2, pady=10)
+button_calculate = c.CTkButton(frame_calculator, text="Calculate", command=calculate_and_display_cost, fg_color="green", text_color="white")
+button_calculate.grid(row=6, column=0, columnspan=2, pady=(20, 10))
 
-label_result = tk.Label(frame_calculator, text="Calculation result")
-label_result.grid(row=7, column=0, columnspan=2)
+#Fonten ændres, så man kan se det bedre
+bold_font = c.CTkFont(size=12, weight="bold")
+label_result = c.CTkLabel(frame_calculator, text="Calculation result", fg_color="#333333", text_color="white", font=bold_font)
+label_result.grid(row=7, column=0, columnspan=2, pady=(20, 10))
+
+
 
 # Knap til at fremvise gemte beregninger
-#Knap til at fremvise beregninger skal blive vist i anden frame. VIRKER IKKE
-show_calculations_buttons = tk.Button(frame_calculator, text="Vis gemte beregninger", command= show_saved_calculations)
-show_calculations_buttons.grid(row=7, column=0, columnspan=2, pady=10)
-
-
-def back_to_menu_from_calculator():
-    frame_calculator.pack_forget()  # Skjul beregningsskærmen
-    menu_frame.pack(padx=10, fill="both", expand=True)  # Vis menuen
+#Knap til at fremvise beregninger skal blive vist i anden frame. 
+show_calculations_button = c.CTkButton(
+    frame_calculator,
+    text="Show saved calculations",
+    command=show_saved_calculations,
+    fg_color="blue",  # Blå farve for at skelne fra andre knapper
+    text_color="white"
+)
+show_calculations_button.grid(row=8, column=0, columnspan=2, pady=10)
 
 # Tilføj knappen "Tilbage" til at gå tilbage til menuen
-button_back_to_menu = tk.Button(
+button_back_to_menu = c.CTkButton(
     frame_calculator, 
     text="Back", 
-    command=lambda: back_to_menu_from_calculator()
+    command=lambda:back_to_menu_from_calculator(),
+    fg_color="red",  # Rød farve
+    text_color="white"  # Hvid tekstfarve
 )
-button_back_to_menu.grid(row=9, column=0, columnspan=2, pady=10)
+button_back_to_menu.grid(row=9, column=0, columnspan=2, pady=(20, 10))
 
 # Run the Tkinter main loop
 frame.pack()
